@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-    logger.info("Tube Snatch - YouTube Downloader Server Starting...")
-
 @app.route('/api/test', methods=['GET'])
 def test_connection():
     logger.info("Test endpoint hit!")
@@ -789,5 +787,6 @@ def download_file(video_id):
 
 if __name__ == '__main__':
     setup_database()
+    logger.info("Tube Snatch - YouTube Downloader Server Starting...")
     logger.info("Starting server on http://127.0.0.1:8000")
     app.run(debug=True, host='127.0.0.1', port=8000)
