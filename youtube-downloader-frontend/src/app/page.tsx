@@ -302,6 +302,18 @@ export default function Home() {
   // Reset to step 1
   const resetToStart = () => {
     setStep(1);
+    // Don't clear videos/channelUrl to prevent user from getting kicked out
+    setSelectedVideos(new Set());
+    setError('');
+    setDownloadProgress({});
+    setSearchQuery('');
+    setSelectedCategory('All Videos');
+    setCurrentPage(1);
+  };
+
+  const goBackToChannelInput = () => {
+    setStep(1);
+    setChannelUrl('');
     setVideos([]);
     setSelectedVideos(new Set());
     setError('');
@@ -309,6 +321,7 @@ export default function Home() {
     setDownloadProgress({});
     setSearchQuery('');
     setSelectedCategory('All Videos');
+    setCurrentPage(1);
   };
 
   // Pagination calculations (works with filtered videos)
@@ -342,7 +355,7 @@ export default function Home() {
         >
           <h1 className="text-5xl font-bold mb-4 flex items-center justify-center gap-3 text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-red-400 to-red-600">
             <Sparkles className="text-red-400" size={40} />
-            Uncle Hyde's Legacy
+            Tube Snatch
             <Sparkles className="text-red-400" size={40} />
           </h1>
           <p className="text-red-200 text-xl">YouTube Channel Video Downloader</p>
@@ -545,16 +558,27 @@ export default function Home() {
                 {/* Channel Info & Controls */}
                 <Card className="glass-dark border-red-900/50">
                   <CardHeader>
-                    <CardTitle className="text-red-400 text-2xl">
-                      Step 2: Select Videos to Download
-                    </CardTitle>
-                    <CardDescription className="text-red-200">
-                      {selectedCategory === 'All Videos' ? (
-                        <>All Channels • {filteredVideos.length} of {videos.length} videos • Page {currentPage} of {totalPages}</>
-                      ) : (
-                        <>{selectedCategory} • {filteredVideos.length} of {videos.filter(v => v.channel_name === selectedCategory).length} videos • Page {currentPage} of {totalPages}</>
-                      )}
-                    </CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-red-400 text-2xl">
+                          Step 2: Select Videos to Download
+                        </CardTitle>
+                        <CardDescription className="text-red-200">
+                          {selectedCategory === 'All Videos' ? (
+                            <>All Channels • {filteredVideos.length} of {videos.length} videos • Page {currentPage} of {totalPages}</>
+                          ) : (
+                            <>{selectedCategory} • {filteredVideos.length} of {videos.filter(v => v.channel_name === selectedCategory).length} videos • Page {currentPage} of {totalPages}</>
+                          )}
+                        </CardDescription>
+                      </div>
+                      <Button
+                        onClick={goBackToChannelInput}
+                        variant="outline"
+                        className="border-red-600 text-red-400 hover:bg-red-600/20"
+                      >
+                        ← New Channel
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {/* Category Filter */}
@@ -634,7 +658,7 @@ export default function Home() {
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <div className="px-4 py-2 bg-red-600/20 border border-red-600 rounded-lg text-red-300 text-sm">
-                          🎬 Always Highest Quality (Up to 4K)
+                          🎬 1080p Quality (Like Y2mate)
                         </div>
                         <select
                           value={videosPerPage}

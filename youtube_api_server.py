@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-logger.info("Uncle Hyde's Legacy - YouTube Downloader Server Starting...")
+    logger.info("Tube Snatch - YouTube Downloader Server Starting...")
 
 @app.route('/api/test', methods=['GET'])
 def test_connection():
@@ -60,16 +60,35 @@ def fetch_channel_with_ytdlp(channel_url, content_type='videos'):
     """⚡ UNCLE HYDE'S LIGHTNING FAST FETCH - No timeouts, maximum speed!"""
     logger.info(f"⚡ UNCLE HYDE'S SPEED DEMON MODE! Fetching {content_type} from: {channel_url}")
     
-    # Fast strategies with timeouts to prevent hanging - optimized for 1500 videos max
+    # UNCLE HYDE'S MEGA CHANNEL STRATEGIES - Optimized for 2000+ videos!
     strategies = [
         {
-            'name': '⚡ Lightning Web Client',
-            'timeout': 20,  # Increased timeout for large channels
+            'name': '🏆 MEGA CHANNEL DESTROYER',
+            'timeout': 40,  # MAXIMUM timeout for channels like MrBeast (900+ videos)
             'opts': {
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': True,
-                'playlistend': 1500,  # Max 1500 videos
+                'playlistend': 2000,  # MASSIVE limit for mega channels like MrBeast
+                'socket_timeout': 35,
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['web'],
+                        'player_skip': ['configs'],
+                        'tab': content_type if content_type != 'videos' else None
+                    }
+                }
+            }
+        },
+        {
+            'name': '⚡ Lightning Web Client',
+            'timeout': 20,
+            'opts': {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True,
+                'playlistend': 1500,
                 'socket_timeout': 15,
                 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'extractor_args': {
@@ -87,7 +106,7 @@ def fetch_channel_with_ytdlp(channel_url, content_type='videos'):
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': True,
-                'playlistend': 1500,  # Max 1500 videos
+                'playlistend': 1800,  # Increased limit
                 'socket_timeout': 12,
                 'user_agent': 'com.google.android.youtube/17.36.4 (Linux; U; Android 12) gzip',
                 'extractor_args': {
@@ -104,7 +123,7 @@ def fetch_channel_with_ytdlp(channel_url, content_type='videos'):
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': True,
-                'playlistend': 1500,  # Max 1500 videos
+                'playlistend': 1800,  # Increased limit
                 'socket_timeout': 20,
                 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'extractor_args': {
@@ -123,7 +142,7 @@ def fetch_channel_with_ytdlp(channel_url, content_type='videos'):
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': True,
-                'playlistend': 1500,  # Max 1500 videos
+                'playlistend': 1800,  # Increased limit
                 'socket_timeout': 10
             }
         }
@@ -518,20 +537,21 @@ def download_video_thread(video_id, resolution):
             elif d['status'] == 'finished':
                 download_progress[video_id] = {'status': 'completed', 'progress': 100, 'file_path': d['filename']}
         
-        # Configure yt-dlp for downloading at highest quality always
+        # Configure yt-dlp for 1080p MAXIMUM quality like Y2mate (DASH merging)
         ydl_opts = {
-            'format': 'best[height<=2160]/best',  # Up to 4K, then best available
+            'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]',  # 1080p max with DASH merging
             'outtmpl': f'downloads/{video_id}_%(title)s.%(ext)s',  # Include video ID in filename
+            'merge_output_format': 'mp4',  # Force merge to MP4 like Y2mate
             'progress_hooks': [progress_hook],
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'extractor_args': {
                 'youtube': {
                     'player_client': ['android', 'web'],
                     'player_skip': ['configs', 'webpage']
                 }
             },
-            'retries': 3,
-            'fragment_retries': 3,
+            'retries': 5,
+            'fragment_retries': 5,
             'skip_unavailable_fragments': True,
         }
         
@@ -616,11 +636,12 @@ def stream_download(video_id):
         # Get YouTube video URL
         video_url = f"https://www.youtube.com/watch?v={video_id}"
         
-        # Configure yt-dlp for direct streaming at highest quality
+        # Configure yt-dlp for 1080p MAXIMUM quality like Y2mate (DASH merging)
         ydl_opts = {
-            'format': 'best[height<=2160]/best',  # Always highest quality up to 4K
+            'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]',  # 1080p max with DASH merging
             'quiet': True,
             'no_warnings': True,
+            'merge_output_format': 'mp4',  # Force merge to MP4
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'extractor_args': {
                 'youtube': {
@@ -628,8 +649,8 @@ def stream_download(video_id):
                     'player_skip': ['configs', 'webpage']
                 }
             },
-            'retries': 3,
-            'fragment_retries': 3,
+            'retries': 5,
+            'fragment_retries': 5,
             'skip_unavailable_fragments': True,
         }
         

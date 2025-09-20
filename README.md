@@ -1,6 +1,6 @@
-# Uncle Hyde's Legacy - YouTube Channel Downloader
+# 🔥 Tube Snatch - YouTube Channel Downloader
 
-A beautiful, modern YouTube channel video downloader with Apple's liquid glass UI design. This project honors Uncle Hyde's final coding mission.
+A beautiful, modern YouTube channel video downloader with Apple's liquid glass UI design and 1080p quality downloads like Y2mate.
 
 ## Features
 
