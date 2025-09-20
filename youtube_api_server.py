@@ -807,6 +807,128 @@ def download_file(video_id):
         logger.error(f"Error serving download: {str(e)}")
         return redirect(f'/api/stream-download/{video_id}')
 
+@app.route('/api/play-video/<video_id>', methods=['GET'])
+def play_video(video_id):
+    """Stream video for web player with quality selection"""
+    try:
+        conn = setup_database()
+        c = conn.cursor()
+        c.execute("SELECT * FROM videos WHERE video_id=?", (video_id,))
+        video = c.fetchone()
+        conn.close()
+        
+        if not video:
+            logger.error(f"Video {video_id} not found in database")
+            return jsonify({'error': 'Video not found'}), 404
+        
+        video_title = video[2]
+        quality = request.args.get('quality', '720p')  # Default to 720p for streaming
+        
+        logger.info(f"🎥 Streaming video for player: {video_title} at {quality}")
+        
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        # Configure yt-dlp for streaming playback with quality selection
+        if quality == '1080p':
+            format_selector = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]'
+        elif quality == '720p':
+            format_selector = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]'
+        elif quality == '480p':
+            format_selector = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]'
+        else:
+            format_selector = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]'
+        
+        ydl_opts = {
+            'format': format_selector,
+            'quiet': True,
+            'no_warnings': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'player_skip': ['configs', 'webpage']
+                }
+            },
+            'retries': 3,
+            'fragment_retries': 3,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            if not info:
+                return jsonify({'error': 'Could not extract video info'}), 500
+            
+            # Get direct stream URL
+            stream_url = info.get('url')
+            if not stream_url and 'formats' in info:
+                formats = info['formats']
+                for fmt in formats:
+                    if fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none':
+                        stream_url = fmt.get('url')
+                        break
+            
+            if not stream_url:
+                return jsonify({'error': 'No stream URL found'}), 500
+            
+            # Return video info for the web player
+            return jsonify({
+                'success': True,
+                'video_id': video_id,
+                'title': video_title,
+                'stream_url': stream_url,
+                'quality': quality,
+                'duration': info.get('duration', 0),
+                'thumbnail': f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+            })
+            
+    except Exception as e:
+        logger.error(f"❌ Play video error for {video_id}: {str(e)}")
+        return jsonify({'error': f'Play video failed: {str(e)}'}), 500
+
+@app.route('/api/video-qualities/<video_id>', methods=['GET'])
+def get_video_qualities(video_id):
+    """Get available qualities for a video"""
+    try:
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'listformats': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            if not info:
+                return jsonify({'error': 'Could not extract video info'}), 500
+            
+            # Extract available qualities
+            qualities = set()
+            if 'formats' in info:
+                for fmt in info['formats']:
+                    height = fmt.get('height')
+                    if height and fmt.get('vcodec') != 'none':
+                        if height >= 1080:
+                            qualities.add('1080p')
+                        elif height >= 720:
+                            qualities.add('720p')
+                        elif height >= 480:
+                            qualities.add('480p')
+            
+            # Default qualities if none found
+            if not qualities:
+                qualities = {'720p', '480p'}
+            
+            return jsonify({
+                'success': True,
+                'qualities': sorted(list(qualities), key=lambda x: int(x[:-1]), reverse=True)
+            })
+            
+    except Exception as e:
+        logger.error(f"❌ Get qualities error for {video_id}: {str(e)}")
+        return jsonify({'error': f'Get qualities failed: {str(e)}'}), 500
+
 if __name__ == '__main__':
     setup_database()
     logger.info("Tube Snatch - YouTube Downloader Server Starting...")

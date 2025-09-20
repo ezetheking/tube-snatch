@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Play, Clock, CheckCircle, Circle, Loader2, Sparkles, AlertCircle, Monitor, XCircle, Info, X } from 'lucide-react';
+import { Download, Play, Clock, CheckCircle, Circle, Loader2, Sparkles, AlertCircle, Monitor, XCircle, Info, X, PlayCircle, Settings } from 'lucide-react';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +44,13 @@ export default function Home() {
   const [videosPerPage, setVideosPerPage] = useState(12); // Show 12 videos per page
   const [downloadingVideos, setDownloadingVideos] = useState<Set<string>>(new Set());
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
+  
+  // Video Player States
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  const [currentVideo, setCurrentVideo] = useState<any>(null);
+  const [videoQualities, setVideoQualities] = useState<string[]>(['720p']);
+  const [selectedQuality, setSelectedQuality] = useState('720p');
+  const [videoStreamUrl, setVideoStreamUrl] = useState('');
 
   // Add notification function
   const addNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -322,6 +329,66 @@ export default function Home() {
     setSearchQuery('');
     setSelectedCategory('All Videos');
     setCurrentPage(1);
+  };
+
+  // Video Player Functions
+  const playVideo = async (video: Video) => {
+    try {
+      setCurrentVideo(video);
+      addNotification(`🎥 Loading video player for "${video.title}"...`, 'info');
+      
+      // Get available qualities
+      const qualitiesResponse = await axios.get(`${API_BASE}/api/video-qualities/${video.video_id}`, {
+        timeout: 30000
+      });
+      
+      if (qualitiesResponse.data.success) {
+        setVideoQualities(qualitiesResponse.data.qualities);
+        setSelectedQuality(qualitiesResponse.data.qualities[0] || '720p');
+        
+        // Get video stream
+        await loadVideoStream(video.video_id, qualitiesResponse.data.qualities[0] || '720p');
+        setShowVideoPlayer(true);
+        addNotification(`▶️ Video player loaded successfully!`, 'success');
+      }
+    } catch (error: any) {
+      console.error('❌ Error loading video player:', error);
+      addNotification(`❌ Failed to load video player: ${error.message || 'Unknown error'}`, 'error');
+    }
+  };
+
+  const loadVideoStream = async (videoId: string, quality: string) => {
+    try {
+      const response = await axios.get(`${API_BASE}/api/play-video/${videoId}?quality=${quality}`, {
+        timeout: 30000
+      });
+      
+      if (response.data.success) {
+        setVideoStreamUrl(response.data.stream_url);
+        setSelectedQuality(quality);
+      } else {
+        throw new Error(response.data.error || 'Failed to get stream URL');
+      }
+    } catch (error: any) {
+      console.error('❌ Error loading video stream:', error);
+      addNotification(`❌ Failed to load video stream: ${error.message || 'Unknown error'}`, 'error');
+    }
+  };
+
+  const changeVideoQuality = async (quality: string) => {
+    if (currentVideo) {
+      addNotification(`🔄 Switching to ${quality}...`, 'info');
+      await loadVideoStream(currentVideo.video_id, quality);
+      addNotification(`✅ Quality changed to ${quality}`, 'success');
+    }
+  };
+
+  const closeVideoPlayer = () => {
+    setShowVideoPlayer(false);
+    setCurrentVideo(null);
+    setVideoStreamUrl('');
+    setVideoQualities(['720p']);
+    setSelectedQuality('720p');
   };
 
   // Pagination calculations (works with filtered videos)
@@ -759,7 +826,7 @@ export default function Home() {
                         }`}
                         onClick={() => toggleVideoSelection(video.video_id)}
                       >
-                        <div className="relative">
+                        <div className="relative group">
                           {video.thumbnail_url ? (
                             <img
                               src={video.thumbnail_url}
@@ -774,6 +841,37 @@ export default function Home() {
                               <Play className="text-red-400" size={24} />
                             </div>
                           )}
+                          
+                          {/* Play Button Overlay */}
+                          <motion.div
+                            className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playVideo(video);
+                            }}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <motion.div
+                              className="bg-red-600 rounded-full p-3 shadow-lg hover:bg-red-700"
+                              animate={{ 
+                                boxShadow: [
+                                  "0 0 20px rgba(239, 68, 68, 0.5)",
+                                  "0 0 30px rgba(239, 68, 68, 0.8)", 
+                                  "0 0 20px rgba(239, 68, 68, 0.5)"
+                                ]
+                              }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                            >
+                              <PlayCircle className="text-white" size={32} />
+                            </motion.div>
+                          </motion.div>
+                          
+                          {/* Duration badge */}
+                          <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-white text-xs">
+                            {video.duration}
+                          </div>
+                          
                           <div className="absolute top-2 left-2">
                             <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                               selectedVideos.has(video.video_id) 
@@ -834,6 +932,121 @@ export default function Home() {
             </motion.div>
           )}
 
+        </AnimatePresence>
+        
+        {/* Video Player Modal */}
+        <AnimatePresence>
+          {showVideoPlayer && currentVideo && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+              onClick={closeVideoPlayer}
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                className="bg-black rounded-xl overflow-hidden max-w-6xl w-full max-h-[90vh] glass-dark border border-red-900/50"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Video Player Header */}
+                <div className="flex items-center justify-between p-4 border-b border-red-900/30">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-white font-bold text-lg truncate">{currentVideo.title}</h2>
+                    <p className="text-red-300/70 text-sm">{currentVideo.channel_name}</p>
+                  </div>
+                  
+                  {/* Quality Selector */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Settings className="text-red-400" size={16} />
+                      <select
+                        value={selectedQuality}
+                        onChange={(e) => changeVideoQuality(e.target.value)}
+                        className="bg-black/50 text-white border border-red-600/50 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        {videoQualities.map((quality) => (
+                          <option key={quality} value={quality}>
+                            {quality}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <Button
+                      onClick={closeVideoPlayer}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-600 text-red-400 hover:bg-red-600/20"
+                    >
+                      <X size={16} />
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Video Player */}
+                <div className="relative bg-black">
+                  {videoStreamUrl ? (
+                    <video
+                      key={`${currentVideo.video_id}-${selectedQuality}`}
+                      controls
+                      autoPlay
+                      className="w-full h-auto max-h-[70vh]"
+                      poster={currentVideo.thumbnail_url}
+                      crossOrigin="anonymous"
+                    >
+                      <source src={videoStreamUrl} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  ) : (
+                    <div className="flex items-center justify-center h-96">
+                      <div className="text-center">
+                        <Loader2 className="mx-auto mb-4 animate-spin text-red-500" size={48} />
+                        <p className="text-white">Loading video...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Video Player Footer */}
+                <div className="p-4 border-t border-red-900/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline" className="border-red-600 text-red-400">
+                        📺 Ad-Free Streaming
+                      </Badge>
+                      <Badge variant="outline" className="border-green-600 text-green-400">
+                        🎬 {selectedQuality} Quality
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => downloadVideoToBrowser(currentVideo.video_id, currentVideo.title)}
+                        disabled={downloadingVideos.has(currentVideo.video_id)}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        size="sm"
+                      >
+                        {downloadingVideos.has(currentVideo.video_id) ? (
+                          <>
+                            <Loader2 className="mr-2 animate-spin" size={16} />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="mr-2" size={16} />
+                            Download
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </div>
