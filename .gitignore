@@ -1,0 +1,62 @@
+# Uncle Hyde's YouTube Downloader .gitignore
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Local files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Downloads
+downloads/
+*.mp4
+*.webm
+*.mkv
+
+# Database
+*.db
+*.sqlite
+*.db-journal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python virtual environment
+Scripts/
+Include/
+Lib/
+pyvenv.cfg
+
+# Temporary files
+*.tmp
+*.temp
