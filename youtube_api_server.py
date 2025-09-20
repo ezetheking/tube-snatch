@@ -2,6 +2,8 @@ import os
 import sqlite3
 import json
 import logging
+import uuid
+import tempfile
 from flask import Flask, request, jsonify, send_file, redirect
 from flask_cors import CORS
 from pytube import YouTube, Channel
@@ -652,61 +654,81 @@ def stream_download(video_id):
             'skip_unavailable_fragments': True,
         }
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Extract video info to get direct URL
-            info = ydl.extract_info(video_url, download=False)
-            if not info:
-                return jsonify({'error': 'Could not extract video info'}), 500
-            
-            # Get the best format URL
-            if 'url' in info:
-                direct_url = info['url']
-            elif 'formats' in info and info['formats']:
-                # Find best format
-                formats = info['formats']
-                best_format = None
-                for fmt in formats:
-                    if fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none':  # Has both video and audio
-                        best_format = fmt
-                        break
-                if not best_format and formats:
-                    best_format = formats[-1]  # Fallback to last format
-                
-                if best_format and 'url' in best_format:
-                    direct_url = best_format['url']
-                else:
-                    return jsonify({'error': 'No suitable format found'}), 500
-            else:
-                return jsonify({'error': 'No downloadable formats found'}), 500
+        # Download to temp file first with proper 1080p quality, then stream it
         
-        # Redirect browser to direct YouTube URL with proper headers for download
+        temp_id = uuid.uuid4().hex
+        temp_filename = f"temp_{temp_id}.%(ext)s"
+        temp_path = os.path.join("downloads", temp_filename)
+        os.makedirs("downloads", exist_ok=True)
+        
+        # Update ydl_opts to actually download the file with proper quality
+        ydl_opts['outtmpl'] = temp_path
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                logger.info(f"🎬 Downloading 1080p video {video_id} to temp file...")
+                ydl.download([video_url])
+            
+            # Find the actual downloaded file (yt-dlp might change the extension)
+            actual_file = None
+            downloads_dir = "downloads"
+            if os.path.exists(downloads_dir):
+                for filename in os.listdir(downloads_dir):
+                    if filename.startswith(f"temp_{temp_id}"):
+                        actual_file = os.path.join(downloads_dir, filename)
+                        break
+            
+            if not actual_file or not os.path.exists(actual_file):
+                return jsonify({'error': 'Failed to download video file'}), 500
+            
+            logger.info(f"✅ Successfully downloaded 1080p file: {actual_file}")
+            
+        except Exception as e:
+            logger.error(f"❌ Download failed: {str(e)}")
+            return jsonify({'error': f'Download failed: {str(e)}'}), 500
+        
+        # Stream the actual 1080p downloaded file to browser
         from flask import Response, stream_with_context
-        import requests
         
         def generate():
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://www.youtube.com/'
-            }
-            
-            with requests.get(direct_url, headers=headers, stream=True) as r:
-                r.raise_for_status()
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:
-                        yield chunk
+            with open(actual_file, 'rb') as f:
+                while True:
+                    chunk = f.read(8192)
+                    if not chunk:
+                        break
+                    yield chunk
+        
+        # Get file size for proper download progress
+        file_size = os.path.getsize(actual_file)
         
         response = Response(
             stream_with_context(generate()),
             mimetype='video/mp4',
             headers={
                 'Content-Disposition': f'attachment; filename="{clean_filename}"',
+                'Content-Length': str(file_size),
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Expose-Headers': 'Content-Disposition',
+                'Access-Control-Expose-Headers': 'Content-Disposition,Content-Length',
                 'Cache-Control': 'no-cache'
             }
         )
         
-        logger.info(f"✅ Started streaming download: {clean_filename}")
+        # Clean up temp file after streaming (in background)
+        def cleanup_temp_file():
+            try:
+                time.sleep(5)  # Wait a bit for download to start
+                if os.path.exists(actual_file):
+                    os.remove(actual_file)
+                    logger.info(f"🗑️ Cleaned up temp file: {actual_file}")
+            except Exception as e:
+                logger.warning(f"Could not clean up temp file: {e}")
+        
+        import threading
+        cleanup_thread = threading.Thread(target=cleanup_temp_file)
+        cleanup_thread.daemon = True
+        cleanup_thread.start()
+        
+        logger.info(f"✅ Started streaming 1080p download: {clean_filename} ({file_size} bytes)")
         return response
         
     except Exception as e:
